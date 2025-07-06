@@ -1,7 +1,7 @@
 import { GenerateRequest, GenerateResponse, ChatListItem, ChatHistoryItem } from '../types/api';
 import { AuthService, User } from './auth';
 
-const BASE_URL = 'http://localhost:8080';
+const BASE_URL = 'https://ai-animation-studio.onrender.com';
 
 export class ApiService {
   static async generateAnimation(

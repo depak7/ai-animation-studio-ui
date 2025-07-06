@@ -202,7 +202,7 @@ export class AuthService {
       }
       
       // Send to backend for verification and get our JWT
-      const backendResponse = await fetch('http://localhost:8080/api/auth/google-authorize', {
+      const backendResponse = await fetch('https://ai-animation-studio.onrender.com/api/auth/google-authorize', {
         method: 'POST',
         headers: this.getAuthHeaders(currentUser),
         body: JSON.stringify(requestBody),
