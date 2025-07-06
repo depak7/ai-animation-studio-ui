@@ -39,7 +39,7 @@ export class SSEService {
       };
 
       this.eventSource.onerror = (error) => {
-        console.error('SSE error:', error);
+        console.error('SSE error for conversation:', conversationId, error);
         // Don't call callback on error to avoid undefined issues
       };
 
