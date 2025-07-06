@@ -16,7 +16,7 @@ export class SSEService {
     this.subscribers.set(conversationId, callback);
     
     // Create new EventSource for this conversation
-    const url = `http://localhost:8080/render/stream?conversationId=${conversationId}`;
+    const url = `https://ai-animator-manim-runner.livelyocean-b0186b38.southindia.azurecontainerapps.io/render/logs/stream?conversationId=${conversationId}`;
     
     try {
       this.eventSource = new EventSource(url);
