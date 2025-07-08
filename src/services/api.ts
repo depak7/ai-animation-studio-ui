@@ -1,7 +1,16 @@
 import { GenerateRequest, GenerateResponse, ChatListItem, ChatHistoryItem } from '../types/api';
 import { AuthService, User } from './auth';
 
-const BASE_URL = 'https://ai-animation-studio.onrender.com';
+// const BASE_URL = 'https://ai-animation-studio.onrender.com';
+const BASE_URL = 'http://localhost:8080';
+
+export interface CustomCodeRequest {
+  prompt: string; // always 'user custom code'
+  customCode: string;
+  skipllmResponse: boolean;
+  chatId: number;
+  conversationId: string;
+}
 
 export class ApiService {
   static async generateAnimation(
@@ -122,6 +131,57 @@ export class ApiService {
         const errorText = await response.text();
         throw new Error(`Failed to delete chat: ${response.status} ${response.statusText}. ${errorText}`);
       }
+    } catch (error) {
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new Error('Network error: Unable to connect to server. Please check your connection.');
+      }
+      throw error;
+    }
+  }
+
+  static async runCustomCode(
+    code: string,
+    user: User | null,
+    chatId: number,
+    conversationId: string
+  ): Promise<GenerateResponse> {
+    const headers = AuthService.getAuthHeaders(user);
+    const request: CustomCodeRequest = {
+      prompt: 'user custom code',
+      customCode: code,
+      skipllmResponse: true,
+      chatId,
+      conversationId
+    };
+    try {
+      const response = await fetch(`${BASE_URL}/api/diagrams/generate`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(request),
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API request failed: ${response.status} ${response.statusText}. ${errorText}`);
+      }
+      const data = await response.json();
+      if (!data || !data.success) {
+        throw new Error('Invalid response from server');
+      }
+      const diagram = data.diagram;
+      if (!diagram) {
+        throw new Error('No diagram data in response');
+      }
+      return {
+        id: diagram.id,
+        prompt: diagram.prompt,
+        userId: diagram.userId?.toString() || '',
+        chatId: diagram.chatId,
+        conversationId: conversationId,
+        jsonRepresentation: diagram.jsonRepresentation || '{}',
+        generatedCode: diagram.generatedCode || '',
+        videoSource: diagram.videoSource || '',
+        createdAt: diagram.createdAt || new Date().toISOString()
+      };
     } catch (error) {
       if (error instanceof TypeError && error.message.includes('fetch')) {
         throw new Error('Network error: Unable to connect to server. Please check your connection.');

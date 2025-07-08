@@ -427,6 +427,30 @@ function App() {
                       apiResponse={getLatestResponse()}
                       currentMessage={currentMessage}
                       onVideoSelect={handleVideoSelect}
+                      user={user}
+                      chatId={currentChatId}
+                      onCustomRunComplete={(msg) => {
+                        setCurrentChat(prev => {
+                          if (!prev) return null;
+                          // If a message with the same conversationId exists, replace it; otherwise, append
+                          const existingIdx = prev.messages.findIndex(m => m.conversationId && msg.conversationId && m.conversationId === msg.conversationId);
+                          let newMessages;
+                          if (existingIdx !== -1) {
+                            newMessages = prev.messages.map((m, i) => i === existingIdx ? msg : m);
+                          } else {
+                            newMessages = [...prev.messages, msg];
+                          }
+                          return {
+                            ...prev,
+                            messages: newMessages,
+                            lastUpdated: new Date(),
+                            latestVideoUrl: msg.apiResponse?.videoSource || prev.latestVideoUrl
+                          };
+                        });
+                        if (msg.apiResponse?.videoSource) {
+                          setSelectedVideoUrl(msg.apiResponse.videoSource);
+                        }
+                      }}
                     />
                   ) : (
                     <WelcomeScreen />

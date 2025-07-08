@@ -18,16 +18,20 @@ export class AuthService {
     try {
       const stored = localStorage.getItem(this.STORAGE_KEY);
       if (stored) {
-        const user = JSON.parse(stored);
-        // Validate user object structure
-        if (user && typeof user.id === 'string' && typeof user.isGuest === 'boolean') {
-          return user;
+        const parsed = JSON.parse(stored);
+        const now = Date.now();
+        // Only expire guest users after 3 hours
+        if (parsed.user && parsed.user.isGuest && parsed.timestamp && now - parsed.timestamp > 10800000) {
+          localStorage.removeItem(this.STORAGE_KEY);
+          return null;
+        }
+        if (parsed.user && typeof parsed.user.id === 'string' && typeof parsed.user.isGuest === 'boolean') {
+          return parsed.user;
         }
       }
       return null;
     } catch (error) {
       console.error('Error getting current user:', error);
-      // Clear corrupted data
       localStorage.removeItem(this.STORAGE_KEY);
       return null;
     }
@@ -42,13 +46,21 @@ export class AuthService {
       isGuest: true,
       guestId: guestId
     };
-    
     try {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(guestUser));
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify({ user: guestUser, timestamp: Date.now() }));
+      // Remove guest user from localStorage when tab is closed
+      window.addEventListener('beforeunload', () => {
+        const stored = localStorage.getItem(AuthService.STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.user && parsed.user.isGuest) {
+            localStorage.removeItem(AuthService.STORAGE_KEY);
+          }
+        }
+      });
     } catch (error) {
       console.error('Error saving guest user:', error);
     }
-    
     return guestUser;
   }
 

@@ -2,6 +2,10 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Play, Download, Share2, RotateCcw, Eye } from 'lucide-react';
 import { GenerateResponse } from '../types/api';
+import { ApiService } from '../services/api';
+import { User } from '../services/auth';
+import { SSEService } from '../services/sse';
+import { v4 as uuidv4 } from 'uuid';
 
 interface VideoPreviewProps {
   isGenerating: boolean;
@@ -12,6 +16,9 @@ interface VideoPreviewProps {
   apiResponse?: GenerateResponse;
   currentMessage?: string;
   onVideoSelect?: (videoUrl: string) => void;
+  user?: User | null;
+  chatId?: number | null;
+  onCustomRunComplete?: (msg: any) => void;
 }
 
 export const VideoPreview: React.FC<VideoPreviewProps> = ({
@@ -22,9 +29,22 @@ export const VideoPreview: React.FC<VideoPreviewProps> = ({
   prompt,
   apiResponse,
   currentMessage = '',
-  onVideoSelect
+  onVideoSelect,
+  user,
+  chatId,
+  onCustomRunComplete
 }) => {
   const [showJson, setShowJson] = useState(false);
+  const [showCodeEditor, setShowCodeEditor] = useState(false);
+  const [editableCode, setEditableCode] = useState(apiResponse?.generatedCode || '');
+  const [isRunningCustom, setIsRunningCustom] = useState(false);
+  const [customProgress, setCustomProgress] = useState(0);
+  const [customLog, setCustomLog] = useState('');
+
+  // Update editableCode when apiResponse changes
+  React.useEffect(() => {
+    setEditableCode(apiResponse?.generatedCode || '');
+  }, [apiResponse?.generatedCode]);
 
   const handleDownload = () => {
     if (videoUrl) {
@@ -134,6 +154,115 @@ export const VideoPreview: React.FC<VideoPreviewProps> = ({
     </div>
   );
 
+  const CodeEditorView = () => (
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="flex-1 flex flex-col">
+        <h3 className="text-sm font-medium text-text-primary mb-2">Generated Code</h3>
+        <textarea
+          className="bg-card-bg border border-border-color rounded-lg p-3 text-xs text-text-secondary overflow-auto w-full h-full font-mono flex-1 resize-none"
+          value={editableCode}
+          onChange={e => setEditableCode(e.target.value)}
+          style={{ fontFamily: 'monospace', minHeight: 0, height: '100%' }}
+        />
+      </div>
+      <div className="mt-4 flex justify-end gap-2">
+        {isRunningCustom && (
+          <span className="text-xs text-accent">Running...</span>
+        )}
+        <button
+          className="px-4 py-2 bg-accent text-white rounded-lg font-medium hover:bg-accent-hover transition-colors"
+          onClick={() => runUserCode(editableCode)}
+          disabled={isRunningCustom}
+        >
+          Run
+        </button>
+      </div>
+      {isRunningCustom && (
+        <div className="mt-4 bg-hover-bg rounded-lg border border-border-color p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs text-accent">Generating...</span>
+            <span className="text-xs text-text-secondary">{customProgress}%</span>
+          </div>
+          <div className="w-full bg-border-color rounded-full h-1.5 mb-2">
+            <div
+              className="bg-accent h-1.5 rounded-full"
+              style={{ width: `${customProgress}%` }}
+            />
+          </div>
+          <div className="text-xs text-text-secondary whitespace-pre-wrap max-h-32 overflow-auto">
+            {customLog}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const runUserCode = async (code: string) => {
+    if (!user) {
+      alert('User not found. Please login or refresh.');
+      return;
+    }
+    setIsRunningCustom(true);
+    setCustomProgress(0);
+    setCustomLog('');
+    const conversationId = uuidv4();
+    // Add a new message to chat (optimistic UI)
+    const newMessage = {
+      id: Date.now().toString(),
+      prompt: 'Custom code run', // Do not show code in chat
+      timestamp: new Date(),
+      isGenerating: true,
+      generationProgress: 0,
+      conversationId,
+      logs: [],
+      // customCode: code // Do not include code in chat message
+    };
+    if (onCustomRunComplete) {
+      onCustomRunComplete({ ...newMessage }); // Add to chat as generating
+    }
+    // Subscribe to SSE logs
+    const sse = SSEService.getInstance();
+    sse.subscribe(conversationId, (msg: string) => {
+      setCustomLog(msg);
+      // Optionally parse progress from msg if available
+      // setCustomProgress(...)
+    });
+    try {
+      const resp = await ApiService.runCustomCode(
+        code,
+        user,
+        chatId || 0,
+        conversationId
+      );
+      // Unsubscribe from SSE
+      sse.unsubscribe(conversationId);
+      // Add completed message to chat
+      const completedMessage = {
+        ...newMessage,
+        isGenerating: false,
+        generationProgress: 100,
+        apiResponse: resp,
+        logs: [customLog],
+        // prompt: 'Custom code run' // Already set
+      };
+      if (onCustomRunComplete) {
+        onCustomRunComplete(completedMessage);
+      }
+      setCustomProgress(100);
+      setCustomLog('');
+      setShowCodeEditor(false); // Switch to video preview after run
+    } catch (err: any) {
+      sse.unsubscribe(conversationId);
+      setCustomLog('Failed to run custom code: ' + (err?.message || err));
+      if (onCustomRunComplete) {
+        onCustomRunComplete({ ...newMessage, isGenerating: false, generationProgress: 0, logs: [customLog] });
+      }
+      setShowCodeEditor(false); // Switch to video preview on error
+    } finally {
+      setIsRunningCustom(false);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -141,9 +270,48 @@ export const VideoPreview: React.FC<VideoPreviewProps> = ({
       className="bg-card-bg rounded-2xl border border-border-color overflow-hidden h-full flex flex-col"
     >
       {/* Video Container */}
-      <div className="relative flex-1 bg-primary min-h-0">
-        {showJson && apiResponse ? (
-          <JsonView />
+      <div className="relative flex-1 bg-primary min-h-0 flex flex-col">
+        {showCodeEditor && (apiResponse) ? (
+          <div className="flex flex-col flex-1 min-h-0">
+            <div className="flex-1 flex flex-col">
+              <h3 className="text-sm font-medium text-text-primary mb-2">Generated Code</h3>
+              <textarea
+                className="bg-card-bg border border-border-color rounded-lg p-3 text-xs text-text-secondary overflow-auto w-full h-full font-mono flex-1 resize-none"
+                value={editableCode}
+                onChange={e => setEditableCode(e.target.value)}
+                style={{ fontFamily: 'monospace', minHeight: 0, height: '100%' }}
+              />
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              {isRunningCustom && (
+                <span className="text-xs text-accent">Running...</span>
+              )}
+              <button
+                className="px-4 py-2 bg-accent text-white rounded-lg font-medium hover:bg-accent-hover transition-colors"
+                onClick={() => runUserCode(editableCode)}
+                disabled={isRunningCustom}
+              >
+                Run
+              </button>
+            </div>
+            {isRunningCustom && (
+              <div className="mt-4 bg-hover-bg rounded-lg border border-border-color p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs text-accent">Generating...</span>
+                  <span className="text-xs text-text-secondary">{customProgress}%</span>
+                </div>
+                <div className="w-full bg-border-color rounded-full h-1.5 mb-2">
+                  <div
+                    className="bg-accent h-1.5 rounded-full"
+                    style={{ width: `${customProgress}%` }}
+                  />
+                </div>
+                <div className="text-xs text-text-secondary whitespace-pre-wrap max-h-32 overflow-auto">
+                  {customLog}
+                </div>
+              </div>
+            )}
+          </div>
         ) : videoUrl && !isGenerating ? (
           <video
             key={videoUrl} // Force re-render when video URL changes
@@ -202,22 +370,22 @@ export const VideoPreview: React.FC<VideoPreviewProps> = ({
                 Share
               </motion.button>
 
-              {/* JSON Toggle */}
+              {/* Code Editor Toggle */}
               {apiResponse && (
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => setShowJson(!showJson)}
+                  onClick={() => setShowCodeEditor(!showCodeEditor)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium 
                            transition-colors duration-200 text-sm ${
-                    showJson 
+                    showCodeEditor 
                       ? 'bg-accent text-white' 
                       : 'bg-hover-bg hover:bg-border-color text-text-primary'
                   }`}
                   disabled={isGenerating}
                 >
                   <Eye size={16} />
-                  {showJson ? 'Video' : 'Structure'}
+                  {showCodeEditor ? 'Video' : 'Code'}
                 </motion.button>
               )}
             </div>

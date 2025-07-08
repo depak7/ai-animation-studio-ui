@@ -149,67 +149,6 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
                           </div>
                         </motion.button>
                       )}
-
-                      {/* JSON Representation */}
-                      <div className="bg-hover-bg rounded-lg border border-border-color overflow-hidden">
-                        <div className="flex items-center justify-between p-2 sm:p-3 border-b border-border-color">
-                          <div className="flex items-center gap-1.5">
-                            <Eye size={10} className="text-accent sm:w-3 sm:h-3" />
-                            <span className="text-xs font-medium text-text-primary">JSON Structure</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() => setExpandedJson(
-                                expandedJson === message.id ? null : message.id
-                              )}
-                              className="p-1 rounded text-text-secondary hover:text-text-primary transition-colors"
-                            >
-                              <Eye size={10} className="sm:w-3 sm:h-3" />
-                            </motion.button>
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() => copyToClipboard(
-                                message.apiResponse!.jsonRepresentation, 
-                                `json-${message.id}`
-                              )}
-                              className="p-1 rounded text-text-secondary hover:text-text-primary transition-colors"
-                            >
-                              {copiedId === `json-${message.id}` ? (
-                                <Check size={10} className="text-green-400 sm:w-3 sm:h-3" />
-                              ) : (
-                                <Copy size={10} className="sm:w-3 sm:h-3" />
-                              )}
-                            </motion.button>
-                          </div>
-                        </div>
-                        
-                        <AnimatePresence>
-                          {expandedJson === message.id && (
-                            <motion.div
-                              initial={{ height: 0, opacity: 0 }}
-                              animate={{ height: 'auto', opacity: 1 }}
-                              exit={{ height: 0, opacity: 0 }}
-                              transition={{ duration: 0.2 }}
-                              className="overflow-hidden"
-                            >
-                              <pre className="p-2 sm:p-3 text-xs text-text-secondary overflow-auto max-h-40 whitespace-pre-wrap">
-                                {formatJsonForDisplay(message.apiResponse.jsonRepresentation)}
-                              </pre>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                        
-                        {expandedJson !== message.id && (
-                          <div className="p-2 sm:p-3">
-                            <p className="text-xs text-text-secondary">
-                              Click to view JSON structure...
-                            </p>
-                          </div>
-                        )}
-                      </div>
                     </div>
                   ) : (
                     <div className="bg-red-400/10 rounded-lg p-2 sm:p-3 border border-red-400/20">
