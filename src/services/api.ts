@@ -1,8 +1,8 @@
 import { GenerateRequest, GenerateResponse, ChatListItem, ChatHistoryItem } from '../types/api';
 import { AuthService, User } from './auth';
 
-// const BASE_URL = 'https://ai-animation-studio.onrender.com';
-const BASE_URL = 'http://localhost:8080';
+const BASE_URL = 'https://ai-animation-studio.onrender.com';
+// const BASE_URL = 'http://localhost:8080';
 
 export interface CustomCodeRequest {
   prompt: string; // always 'user custom code'
