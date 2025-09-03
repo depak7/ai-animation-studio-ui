@@ -1,7 +1,7 @@
 import { GenerateRequest, GenerateResponse, ChatListItem, ChatHistoryItem } from '../types/api';
 import { AuthService, User } from './auth';
 
-const BASE_URL = 'https://ai-animation-studio.onrender.com';
+const BASE_URL = 'https://ai-animator-backend.livelyocean-b0186b38.southindia.azurecontainerapps.io';
 // const BASE_URL = 'http://localhost:8080';
 
 export interface CustomCodeRequest {
